@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: mapek-rabbitmq
+    ports:
+      - "5672:5672"   # Porta padrão do protocolo AMQP (para a aplicação Spring Boot conectar)
+      - "15672:15672" # Porta da Interface Web de Gerenciamento do RabbitMQ (http://localhost:15672)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - mapek-network
+
+  redis:
+    image: redis:alpine
+    container_name: mapek-knowledge-redis
+    ports:
+      - "6379:6379"   # Porta padrão do Redis (para o managing-mapek-controller gerenciar o Knowledge)
+    networks:
+      - mapek-network
+
+networks:
+  mapek-network:
+    driver: bridge

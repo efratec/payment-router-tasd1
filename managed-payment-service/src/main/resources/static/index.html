@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MAPE-K Payment Gateway Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --panel-2: #0b1220;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --border: #334155;
+            --stone: #22c55e;
+            --cielo: #f59e0b;
+            --danger: #ef4444;
+            --accent: #38bdf8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
+        header h1 { font-size: 1.35rem; font-weight: 700; }
+        header p { color: var(--muted); font-size: 0.85rem; }
+        .badge { padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; border: 1px solid var(--border); background: var(--panel); }
+        .badge.stone { color: var(--stone); border-color: rgba(34,197,94,0.4); }
+        .badge.cielo { color: var(--cielo); border-color: rgba(245,158,11,0.4); }
+
+        .grid-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+        .card-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 8px; }
+        .card-value { font-size: 1.6rem; font-weight: 700; }
+        .card-sub { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+
+        .mapek-banner {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+            padding: 16px; margin-bottom: 18px; display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: center;
+        }
+        .mapek-msg { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+        .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--panel-2); border: 1px solid var(--border); }
+        .pill.VIOLATION, .pill.FAILOVER { color: #fca5a5; border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.14); }
+        .pill.IGNORED_MISMATCH { color: #fcd34d; border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.14); }
+        .pill.HEALTHY { color: #86efac; border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.14); }
+
+        .knowledge-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .knowledge-panel.drift {
+            border-color: rgba(245, 158, 11, 0.75);
+            background: rgba(245, 158, 11, 0.08);
+        }
+        .knowledge-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .k-box {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .k-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }
+        .k-val { font-size: 1.05rem; font-weight: 700; margin-top: 4px; }
+        .sync-ok { color: #86efac; }
+        .sync-drift { color: #fcd34d; }
+
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 18px; }
+        .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+        input[type="number"] {
+            width: 95px; padding: 8px 10px; border-radius: 8px;
+            border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+        }
+        button {
+            padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--panel-2); color: var(--text); font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; transition: 0.15s ease;
+        }
+        button:hover { border-color: var(--accent); }
+        button.primary { background: #0284c7; border-color: #0284c7; }
+        button.warn { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.5); color: #fca5a5; }
+        button.ok { background: rgba(34, 197, 94, 0.16); border-color: rgba(34, 197, 94, 0.45); color: #86efac; }
+
+        .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 18px; }
+        @media (max-width: 960px) { .main-grid { grid-template-columns: 1fr; } }
+        .chart-box { position: relative; height: 290px; }
+
+        .side-stack { display: flex; flex-direction: column; gap: 14px; }
+        .list-box { display: flex; flex-direction: column; gap: 8px; max-height: 170px; overflow-y: auto; }
+        .list-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; font-size: 0.8rem; }
+        .list-item strong { color: var(--accent); }
+        .item-time { color: var(--muted); font-size: 0.72rem; margin-top: 3px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+        th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-size: 0.76rem; text-transform: uppercase; }
+        .tag { padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+        .tag.STONE { background: rgba(34,197,94,0.15); color: #86efac; }
+        .tag.CIELO { background: rgba(245,158,11,0.15); color: #fcd34d; }
+        .slow { color: #fca5a5; font-weight: 700; }
+        .toast { font-size: 0.8rem; color: var(--accent); margin-top: 8px; min-height: 18px; }
+    </style>
+</head>
+<body>
+<header>
+    <div>
+        <h1>Payment Gateway — Simulador &amp; Autoadaptação MAPE-K</h1>
+        <p>Monitoramento em tempo real de latência, violações, roteamento dinâmico e failover (STONE ↔ CIELO)</p>
+    </div>
+    <div id="activeBadge" class="badge">Rota Ativa: ...</div>
+</header>
+
+<section class="grid-top">
+    <div class="card">
+        <div class="card-title">Total de Transações</div>
+        <div id="totalPayments" class="card-value">0</div>
+        <div class="card-sub">STONE: <span id="stoneCount">0</span> · CIELO: <span id="cieloCount">0</span></div>
+    </div>
+    <div class="card">
+        <div class="card-title">Violações Consecutivas</div>
+        <div id="violationsValue" class="card-value">0 / 2</div>
+        <div id="trackedAcquirerSub" class="card-sub">Controller rastreia: ...</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Simulador STONE</div>
+        <div id="stoneSimStatus" class="card-value" style="font-size: 1.15rem;">Desativado</div>
+        <div id="stoneSimDelay" class="card-sub">Delay: 0 ms</div>
+    </div>
+    <div class="card">
+        <div class="card-title">Simulador CIELO</div>
+        <div id="cieloSimStatus" class="card-value" style="font-size: 1.15rem;">Desativado</div>
+        <div id="cieloSimDelay" class="card-sub">Delay: 0 ms</div>
+    </div>
+</section>
+
+<section class="mapek-banner">
+    <div>
+        <div class="card-title">Último Diagnóstico / Evento MAPE-K</div>
+        <div id="mapekEventBadge" class="pill">IDLE</div>
+    </div>
+    <div style="grid-column: span 2;">
+        <div class="card-title">Mensagem do Analisador</div>
+        <div id="mapekMessage" class="mapek-msg">Aguardando telemetrias do analisador MAPE-K.</div>
+        <div id="mapekMeta" class="card-sub">Métrica recebida: - · Atualizado: -</div>
+    </div>
+</section>
+
+<section id="knowledgePanel" class="knowledge-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div class="card-title" style="margin-bottom:0;">Base de Conhecimento (Knowledge)</div>
+        <span id="knowledgeSyncBadge" class="pill HEALTHY">Sincronizado</span>
+    </div>
+    <div class="knowledge-grid">
+        <div class="k-box">
+            <div class="k-label">Backend de Estado</div>
+            <div id="kBackend" class="k-val">REDIS</div>
+        </div>
+        <div class="k-box">
+            <div class="k-label">Rota Rastreada (Knowledge)</div>
+            <div id="kTrackedAcquirer" class="k-val">-</div>
+        </div>
+        <div class="k-box">
+            <div class="k-label">Rota Real (Efetor)</div>
+            <div id="kActiveAcquirer" class="k-val">-</div>
+        </div>
+        <div class="k-box">
+            <div class="k-label">Próximo Failover</div>
+            <div id="kNextFailover" class="k-val">-</div>
+        </div>
+        <div class="k-box">
+            <div class="k-label">Limiar SLA / Violações</div>
+            <div id="kThresholdViolations" class="k-val">3000 ms · 0/2</div>
+        </div>
+    </div>
+    <div id="kDriftAlert" class="card-sub" style="margin-top:10px;"></div>
+</section>
+
+<section class="controls">
+    <div class="card">
+        <div class="card-title">Injetar Latência (Simulador)</div>
+        <div class="row">
+            <label for="delayInput" style="font-size:0.84rem; color:var(--muted);">Delay (ms):</label>
+            <input id="delayInput" type="number" value="5000" min="0" step="500" />
+        </div>
+        <div class="row">
+            <button class="warn" onclick="setLatency('STONE', true)">Ligar STONE</button>
+            <button class="ok" onclick="setLatency('STONE', false)">Desligar STONE</button>
+            <button class="warn" onclick="setLatency('CIELO', true)">Ligar CIELO</button>
+            <button class="ok" onclick="setLatency('CIELO', false)">Desligar CIELO</button>
+        </div>
+        <div id="actionFeedback" class="toast"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Disparar Pagamentos de Teste</div>
+        <div class="row">
+            <button class="primary" onclick="sendPayments(1)">Enviar 1 Pagamento</button>
+            <button onclick="sendPayments(3)">Enviar 3 Pagamentos</button>
+            <button onclick="sendPayments(5)">Enviar 5 Pagamentos</button>
+        </div>
+        <div class="card-sub" style="margin-top:10px;">
+            Com 2 violações acima de 3000 ms na adquirente ativa, o controlador MAPE-K publica o comando de failover.
+        </div>
+    </div>
+</section>
+
+<section class="main-grid">
+    <div class="card">
+        <div class="card-title">Latência por Transação (ms) — Limiar SLA: 3000 ms</div>
+        <div class="chart-box">
+            <canvas id="latencyChart"></canvas>
+        </div>
+    </div>
+    <div class="side-stack">
+        <div class="card">
+            <div class="card-title">Adaptações Aplicadas (Efetor)</div>
+            <div id="adaptationHistory" class="list-box">
+                <div class="list-item" style="color:var(--muted);">Nenhuma adaptação registrada ainda.</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">Eventos do Analisador (Monitor / Analyze / Plan)</div>
+            <div id="mapekEventsList" class="list-box">
+                <div class="list-item" style="color:var(--muted);">Nenhum evento recebido ainda.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-title">Últimas Transações</div>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+            <tr>
+                <th>Hora</th>
+                <th>Transaction ID</th>
+                <th>Adquirente</th>
+                <th>Latência</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody id="paymentsTableBody">
+            <tr><td colspan="5" style="color:var(--muted);">Aguardando transações...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<script>
+    const SLA_THRESHOLD = 3000;
+    const ctx = document.getElementById('latencyChart').getContext('2d');
+
+    const slaLinePlugin = {
+        id: 'slaLinePlugin',
+        afterDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea || !scales.y) return;
+            const yPos = scales.y.getPixelForValue(SLA_THRESHOLD);
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+            ctx.lineWidth = 1.5;
+            ctx.moveTo(chartArea.left, yPos);
+            ctx.lineTo(chartArea.right, yPos);
+            ctx.stroke();
+            ctx.fillStyle = '#fca5a5';
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillText('SLA 3000ms', chartArea.left + 8, yPos - 6);
+            ctx.restore();
+        }
+    };
+
+    const latencyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Latência (ms)',
+                data: [],
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                tension: 0.25,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: []
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } },
+                y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+            },
+            plugins: { legend: { labels: { color: '#f8fafc' } } }
+        },
+        plugins: [slaLinePlugin]
+    });
+
+    function showFeedback(msg) {
+        const el = document.getElementById('actionFeedback');
+        el.textContent = msg;
+        setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3500);
+    }
+
+    async function setLatency(acquirer, enable) {
+        const delay = document.getElementById('delayInput').value || 5000;
+        const url = `/api/simulator/latency?acquirer=${encodeURIComponent(acquirer)}&enable=${enable}&delay=${encodeURIComponent(delay)}`;
+        const res = await fetch(url, { method: 'POST' });
+        const text = await res.text();
+        showFeedback(text);
+        await refreshDashboard();
+    }
+
+    async function sendPayments(count) {
+        showFeedback(`Enviando ${count} pagamento(s)...`);
+        const samplePayload = {
+            amount: 150.00,
+            currency: 'BRL',
+            paymentMethod: 'CREDIT_CARD',
+            customerId: 'cust-dashboard-01'
+        };
+        for (let i = 0; i < count; i++) {
+            await fetch('/api/v1/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(samplePayload)
+            });
+        }
+        showFeedback(`${count} pagamento(s) concluído(s).`);
+        await refreshDashboard();
+    }
+
+    function formatTime(iso) {
+        if (!iso) return '-';
+        return new Date(iso).toLocaleTimeString('pt-BR', { hour12: false });
+    }
+
+    async function refreshDashboard() {
+        try {
+            const res = await fetch('/api/dashboard/status');
+            if (!res.ok) return;
+            const data = await res.json();
+
+            const badge = document.getElementById('activeBadge');
+            badge.textContent = `Rota Ativa: ${data.activeAcquirer}`;
+            badge.className = `badge ${data.activeAcquirer === 'CIELO' ? 'cielo' : 'stone'}`;
+
+            document.getElementById('totalPayments').textContent = data.totalPayments;
+            document.getElementById('stoneCount').textContent = data.stoneCount;
+            document.getElementById('cieloCount').textContent = data.cieloCount;
+
+            const mk = data.mapekStatus || {};
+            const viol = mk.consecutiveViolations ?? 0;
+            const thresh = mk.violationThreshold ?? 2;
+            const violEl = document.getElementById('violationsValue');
+            violEl.textContent = `${viol} / ${thresh}`;
+            violEl.style.color = viol >= thresh ? '#fca5a5' : (viol > 0 ? '#fcd34d' : '#f8fafc');
+            document.getElementById('trackedAcquirerSub').textContent = `Controller rastreia: ${mk.trackedAcquirer || '-'}`;
+
+            const evType = mk.eventType || 'IDLE';
+            const evBadge = document.getElementById('mapekEventBadge');
+            evBadge.textContent = evType;
+            evBadge.className = `pill ${evType}`;
+
+            document.getElementById('mapekMessage').textContent = mk.message || '-';
+            document.getElementById('mapekMeta').textContent =
+                `Métrica recebida: ${mk.metricAcquirer || '-'} · Atualizado: ${formatTime(mk.timestamp)}`;
+
+            const tracked = mk.trackedAcquirer || data.activeAcquirer || '-';
+            const active = data.activeAcquirer || '-';
+            const isDrift = tracked !== '-' && active !== '-' && tracked !== active;
+
+            const kPanel = document.getElementById('knowledgePanel');
+            const kSyncBadge = document.getElementById('knowledgeSyncBadge');
+            const kDriftAlert = document.getElementById('kDriftAlert');
+
+            document.getElementById('kBackend').textContent = mk.knowledgeBackend || 'REDIS';
+            document.getElementById('kTrackedAcquirer').textContent = tracked;
+            document.getElementById('kActiveAcquirer').textContent = active;
+            document.getElementById('kNextFailover').textContent =
+                mk.nextFailoverAcquirer || (tracked === 'STONE' ? 'CIELO' : 'STONE');
+            document.getElementById('kThresholdViolations').textContent =
+                `${mk.latencyThresholdMs ?? 3000} ms · ${viol}/${thresh}`;
+
+            if (isDrift) {
+                kPanel.className = 'knowledge-panel drift';
+                kSyncBadge.textContent = 'DRIFT DE ROTA';
+                kSyncBadge.className = 'pill IGNORED_MISMATCH';
+                kDriftAlert.innerHTML =
+                    `<span class="sync-drift">⚠️ Divergência de estado:</span> o controlador rastreia <strong>${tracked}</strong> no Redis, mas a rota ativa no serviço é <strong>${active}</strong>. Métricas de ${active} podem ser ignoradas até alinhar.`;
+            } else {
+                kPanel.className = 'knowledge-panel';
+                kSyncBadge.textContent = 'Sincronizado';
+                kSyncBadge.className = 'pill HEALTHY';
+                kDriftAlert.innerHTML =
+                    `<span class="sync-ok">✔ Estado alinhado</span> entre a Knowledge do controlador e a rota ativa do serviço gerenciado.`;
+            }
+
+            const stoneSim = data.simulators?.STONE || { enabled: false, delayMs: 0 };
+            document.getElementById('stoneSimStatus').textContent = stoneSim.enabled ? 'ATIVADO' : 'Desativado';
+            document.getElementById('stoneSimStatus').style.color = stoneSim.enabled ? '#fca5a5' : '#86efac';
+            document.getElementById('stoneSimDelay').textContent = `Delay: ${stoneSim.delayMs} ms`;
+
+            const cieloSim = data.simulators?.CIELO || { enabled: false, delayMs: 0 };
+            document.getElementById('cieloSimStatus').textContent = cieloSim.enabled ? 'ATIVADO' : 'Desativado';
+            document.getElementById('cieloSimStatus').style.color = cieloSim.enabled ? '#fca5a5' : '#86efac';
+            document.getElementById('cieloSimDelay').textContent = `Delay: ${cieloSim.delayMs} ms`;
+
+            const chronological = [...(data.recentPayments || [])].reverse().slice(-25);
+            latencyChart.data.labels = chronological.map(p => formatTime(p.timestamp));
+            latencyChart.data.datasets[0].data = chronological.map(p => p.latencyMs);
+            latencyChart.data.datasets[0].pointBackgroundColor = chronological.map(p =>
+                p.latencyMs > SLA_THRESHOLD ? '#ef4444' : (p.acquirer === 'CIELO' ? '#f59e0b' : '#22c55e')
+            );
+            latencyChart.update();
+
+            const adaptEl = document.getElementById('adaptationHistory');
+            if (!data.adaptationHistory || data.adaptationHistory.length === 0) {
+                adaptEl.innerHTML = '<div class="list-item" style="color:var(--muted);">Nenhuma adaptação registrada ainda.</div>';
+            } else {
+                adaptEl.innerHTML = data.adaptationHistory.map(a => `
+            <div class="list-item">
+              <div>Rota alterada para <strong>${a.targetAcquirer}</strong></div>
+              <div>${a.reason || ''}</div>
+              <div class="item-time">${formatTime(a.timestamp)}</div>
+            </div>
+          `).join('');
+            }
+
+            const eventsEl = document.getElementById('mapekEventsList');
+            if (!data.mapekEvents || data.mapekEvents.length === 0) {
+                eventsEl.innerHTML = '<div class="list-item" style="color:var(--muted);">Nenhum evento recebido ainda.</div>';
+            } else {
+                eventsEl.innerHTML = data.mapekEvents.slice(0, 12).map(ev => `
+            <div class="list-item">
+              <div><strong>[${ev.eventType || 'EVENT'}]</strong> (${ev.consecutiveViolations ?? 0}/${ev.violationThreshold ?? 2})</div>
+              <div>${ev.message || ''}</div>
+              <div class="item-time">${formatTime(ev.timestamp)}</div>
+            </div>
+          `).join('');
+            }
+
+            const tbody = document.getElementById('paymentsTableBody');
+            if (!data.recentPayments || data.recentPayments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);">Aguardando transações...</td></tr>';
+            } else {
+                tbody.innerHTML = data.recentPayments.slice(0, 15).map(p => `
+            <tr>
+              <td>${formatTime(p.timestamp)}</td>
+              <td style="font-family:monospace;">${(p.transactionId || '').slice(0, 8)}...</td>
+              <td><span class="tag ${p.acquirer}">${p.acquirer}</span></td>
+              <td class="${p.latencyMs > SLA_THRESHOLD ? 'slow' : ''}">${p.latencyMs} ms</td>
+              <td>${p.success ? '✅ OK' : '❌ Falha'}</td>
+            </tr>
+          `).join('');
+            }
+        } catch (e) {
+            console.error('Erro ao atualizar dashboard:', e);
+        }
+    }
+
+    refreshDashboard();
+    setInterval(refreshDashboard, 1000);
+</script>
+</body>
+</html>

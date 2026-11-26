@@ -1,0 +1,15 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: managing-mapek-controller
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+
+mapek:
+  knowledge:
+    key-prefix: "mapek:knowledge:"
+    default-acquirer: "STONE"
